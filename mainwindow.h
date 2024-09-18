@@ -9,6 +9,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 private slots:
     QString openFile();
+    void encodeData();
+    void decodeData();
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();

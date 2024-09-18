@@ -14,12 +14,24 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->addLayout(menubar);
 
     QPushButton *openFileButton = new QPushButton(center);
-
     openFileButton->setText("Load");
-
     connect(openFileButton, &QPushButton::clicked, this, &MainWindow::openFile);
-
     menubar->addWidget(openFileButton);
+
+    QPushButton *encodeDataButton = new QPushButton(center);
+    encodeDataButton->setText("Encode");
+    connect(encodeDataButton, &QPushButton::clicked, this, &MainWindow::encodeData);
+    menubar->addWidget(encodeDataButton);
+
+    QPushButton *decodeDataButton = new QPushButton(center);
+    decodeDataButton->setText("Decode");
+    connect(decodeDataButton, &QPushButton::clicked, this, &MainWindow::decodeData);
+    menubar->addWidget(decodeDataButton);
+
+    QTableWidget *table = new QTableWidget(center);
+    mainLayout->addWidget(table);
+    table->setRowCount(10);
+    table->setColumnCount(5);
 
 
 }
@@ -34,4 +46,12 @@ QString MainWindow::openFile() {
     QString filename = QFileDialog::getOpenFileName();
     qDebug() << filename;
     return filename;
+}
+
+void MainWindow::encodeData() {
+
+}
+
+void MainWindow::decodeData() {
+
 }
