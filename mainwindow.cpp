@@ -1,5 +1,8 @@
 #include "mainwindow.h"
 #include <typeinfo>
+#include "tree.h"
+#include <queue>
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -96,7 +99,22 @@ parent maps to its two children
 
 QVector<QString> MainWindow::encodeHuffman(QVector<int> frequencies) {
 
+    // from chat gpt
+    // Custom comparison functor to prioritize smaller weights (min-heap)
+    struct CompareTree {
+        bool operator()(const Tree& n1, const Tree& n2) {
+            // Return true if n1 has a lower priority than n2
+            // This will make the priority queue a min-heap (smaller weights have higher priority)
+            return n1.root->getWeight() > n2.root->getWeight();
+        }
+    };
 
+    std::priority_queue<Tree, std::vector<Tree>, CompareTree> queue;
+    for (int i = 0; i < frequencies.size(); i++) {
+        queue.push(Tree(frequencies[i], i));
+        qDebug() << frequencies[i];
+
+    }
 }
 
 void MainWindow::encodeData() {
