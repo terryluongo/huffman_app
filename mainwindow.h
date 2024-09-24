@@ -3,14 +3,22 @@
 
 #include <QMainWindow>
 #include <QtWidgets>
+#include <QFile>
+#include <QFileDialog>
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+    QByteArray data;
+    QTableWidget *table;
 private slots:
-    QString openFile();
+    void openFile();
     void encodeData();
     void decodeData();
+
+private:
+    QVector<QString> encodeHuffman(QVector<int> frequencies);
+
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
