@@ -2,7 +2,9 @@
 #include <typeinfo>
 #include "tree.h"
 #include <queue>
-
+#include <QMap>
+#include "node.h"
+#include <QString>
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -63,12 +65,11 @@ void MainWindow::openFile() {
 
     data = file.readAll();
 
-    QVector<int> frequencies(256, 0);
+    frequencies = new QVector<int>(256, 0);
     for (int iPos = 0; iPos < data.length(); ++iPos) {
-        ++frequencies[(unsigned char) data[iPos]];
+        ++(*frequencies)[(unsigned char) data[iPos]];
     }
-
-    qDebug() << frequencies;
+    //qDebug() << frequencies;
 
 
 
@@ -76,28 +77,22 @@ void MainWindow::openFile() {
         QTableWidgetItem *index = new QTableWidgetItem(QString::number(iRow));
         table->setItem(iRow, 0, index);
 
-        QTableWidgetItem *count = new QTableWidgetItem(QString::number(frequencies[iRow]));
+        QTableWidgetItem *count = new QTableWidgetItem(QString::number((*frequencies)[iRow]));
         table->setItem(iRow, 1, count);
 
         QTableWidgetItem *character = new QTableWidgetItem(QString((char) iRow));
         table->setItem(iRow, 2, character);
 
         //TODO: have to sort not lexographically
-        table->sortByColumn(1, Qt::DescendingOrder);
+        //table->sortByColumn(1, Qt::DescendingOrder);
 
-      //  std::priority_queue<Tre queue;
 
     }
-    /* huffman encoding notes
-   sd
-QMap<QByteArray, QPair<QByteArray, QByteArray>>
-parent maps to its two children
 
 
-     */
 }
 
-QVector<QString> MainWindow::encodeHuffman(QVector<int> frequencies) {
+Tree MainWindow::buildTree(QVector<int> frequencies) {
 
     // from chat gpt
     // Custom comparison functor to prioritize smaller weights (min-heap)
@@ -112,12 +107,66 @@ QVector<QString> MainWindow::encodeHuffman(QVector<int> frequencies) {
     std::priority_queue<Tree, std::vector<Tree>, CompareTree> queue;
     for (int i = 0; i < frequencies.size(); i++) {
         queue.push(Tree(frequencies[i], i));
-        qDebug() << frequencies[i];
-
+        //qDebug() << frequencies[i];
     }
+    while (queue.size() > 1) {
+        Tree first = queue.top();
+        queue.pop();
+        Tree second = queue.top();
+        queue.pop();
+        Tree combined = Tree(first.root, second.root);
+        queue.push(combined);
+    }
+
+    return queue.top();
+
+
 }
 
+// helper method for buildEncodingDict method
+// DFS, keeps track of the path traveled
+// once we reach leaf node, add letter to HashMap with corresponding path
+void MainWindow::traverseTree(Node *node, QString path, QMap<int, QString>* encoding_dict) {
+    //if (node == nullptr)
+      //  return;
+    if (node->getLetter() != -1) {
+
+        encoding_dict->insert(node->getLetter(), path);
+        qDebug() << "Inserted:" << node->getLetter() << "Path:" << path;  // Debug output
+
+        return;
+    }
+    //if (node->getLeft() != nullptr)
+        traverseTree(node->getLeft(), path + "0", encoding_dict);
+    //if (node->getRight() != nullptr)
+        traverseTree(node->getRight(), path + "1", encoding_dict);
+}
+
+// issue is when we uncomment this
+// either w/ this or traverseTree
+// traverse tree to figure out binary representation of each string, return in HashMap
+QMap<int, QString>* MainWindow::buildEncodingDict(Tree tree) {
+    QMap<int, QString> *encoding_dict = new QMap<int, QString>();
+    traverseTree(tree.root, "", encoding_dict);
+    return encoding_dict;
+}
+
+
+
+
 void MainWindow::encodeData() {
+    //QVector<int> test_frequencies = {4, 1, 2, 3, 8, 20, 6};
+    Tree tree = buildTree(*frequencies);
+    QMap<int, QString> *code = buildEncodingDict(tree);
+
+    for (int iRow = 0; iRow < 256; ++iRow) {
+        QTableWidgetItem *index = new QTableWidgetItem(QString(code->take(iRow)));
+        table->setItem(iRow, 3, index);
+
+
+
+
+    }
 
 }
 

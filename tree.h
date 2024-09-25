@@ -1,6 +1,8 @@
 #ifndef TREE_H
 #define TREE_H
 #include "node.h"
+#include <QtCore/qdebug.h>
+#include <string>
 class Tree
 {
 public:
@@ -8,6 +10,9 @@ public:
     Tree(Node* left, Node* right);
 
     Node* root;
+
+    std::string buildString(Node* node);
+    friend QDebug operator<<(QDebug dbg, Tree& tree);
 
 };
 

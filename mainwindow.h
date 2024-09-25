@@ -5,12 +5,14 @@
 #include <QtWidgets>
 #include <QFile>
 #include <QFileDialog>
-
+#include "tree.h"
+#include "node.h"
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
     QByteArray data;
     QTableWidget *table;
+    QVector<int> *frequencies;
 private slots:
     void openFile();
     void encodeData();
@@ -18,6 +20,10 @@ private slots:
 
 private:
     QVector<QString> encodeHuffman(QVector<int> frequencies);
+    Tree buildTree(QVector<int> frequencies);
+    QMap<int, QString>* buildEncodingDict(Tree tree);
+    void traverseTree(Node *node, QString path, QMap<int, QString> *encoding_dict);
+
 
 public:
     MainWindow(QWidget *parent = nullptr);

@@ -1,9 +1,8 @@
 #include "node.h"
 
-Node::Node(int weight, int letter) {
-    this->weight = weight;
-    this->letter = letter;
-}
+Node::Node(int weight, int letter)
+    : weight(weight), letter(letter), left(nullptr), right(nullptr)
+{}
 
 int Node::getWeight() {
     return this->weight;
