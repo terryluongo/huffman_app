@@ -98,7 +98,8 @@ void MainWindow::encodeData() {
 
     table->sortByColumn(1, Qt::DescendingOrder);
 
-    convertBinary(data, code);
+    int remLength = 0;
+    QByteArray binaryData = convertBinary(data, code, remLength);
 
 
 
@@ -120,6 +121,11 @@ void MainWindow::encodeData() {
 
     // if it is all Qt objects we can just do this
     out << *code;
+    out << remLength;
+    // have to encode # digits in remainder
+
+    // skip to the good stuff with constData
+    out.writeBytes(binaryData.constData(), binaryData.size());
 
 \
 
@@ -144,7 +150,7 @@ void MainWindow::decodeData() {
 
 }
 
-QByteArray MainWindow::convertBinary(QByteArray data, QMap<int, QString> *code) {
+QByteArray MainWindow::convertBinary(QByteArray data, QMap<int, QString> *code, int &remLength) {
     QString stringStream("");
     for (int i = 0; i < data.size(); i++)
         stringStream += code->value(data[i]);
@@ -163,14 +169,20 @@ QByteArray MainWindow::convertBinary(QByteArray data, QMap<int, QString> *code) 
         out[i] = stringStream.sliced(i * 8, 8).toInt(nullptr, 2);
     }
 
+
+    // convert remainder to int
+    int remainder = stringStream.chopped(stringStream.size() % 8).toInt(nullptr, 2);
+    // if string not evenly divisble set last one to remainder
+    if (stringStream.size() % 8)
+        out[out.size() - 1] = remainder;
+
+    remLength = stringStream.size() % 8;
+    return out;
+
     // do remainder bytes
 
     // have to do .write() and .read() for the unserialized bytes
 
-
-
-
-    return data;
 }
 
 Tree MainWindow::buildTree(QVector<int> frequencies) {
