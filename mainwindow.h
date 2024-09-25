@@ -5,6 +5,7 @@
 #include <QtWidgets>
 #include <QFile>
 #include <QFileDialog>
+#include <QMap>
 #include "tree.h"
 #include "node.h"
 class MainWindow : public QMainWindow
@@ -23,6 +24,7 @@ private:
     Tree buildTree(QVector<int> frequencies);
     QMap<int, QString>* buildEncodingDict(Tree tree);
     void traverseTree(Node *node, QString path, QMap<int, QString> *encoding_dict);
+    QByteArray convertBinary(QByteArray data, QMap<int, QString> *code);
 
 
 public:
