@@ -11,6 +11,7 @@ public:
     void setWeight(int weight);
 
     int getLetter();
+    void setLetter(int letter);
 
     Node* getLeft();
     void setLeft(Node* left);

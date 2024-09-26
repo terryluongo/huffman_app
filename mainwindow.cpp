@@ -99,9 +99,10 @@ void MainWindow::encodeData() {
     table->sortByColumn(1, Qt::DescendingOrder);
 
     int remLength = 0;
+    qDebug() << remLength;
     QByteArray binaryData = convertBinary(data, code, remLength);
 
-
+    qDebug() << remLength;
 
 
 
@@ -127,7 +128,7 @@ void MainWindow::encodeData() {
     // skip to the good stuff with constData
     out.writeBytes(binaryData.constData(), binaryData.size());
 
-\
+    \  out.readBytes()
 
 }
 
@@ -145,6 +146,17 @@ void MainWindow::decodeData() {
     }
     QDataStream in(&inFile);
     in >> code;
+    int remLength;
+    in >> remLength;
+
+    qDebug() << remLength;
+
+    char* rawBytes; uint length;
+    in.readBytes(rawBytes, length);
+    QByteArray bytes(rawBytes, length);
+    delete[] rawBytes;
+
+
 
 
 

@@ -25,6 +25,7 @@ private:
     QMap<int, QString>* buildEncodingDict(Tree tree);
     void traverseTree(Node *node, QString path, QMap<int, QString> *encoding_dict);
     QByteArray convertBinary(QByteArray data, QMap<int, QString> *code, int &remLength);
+    QString decodeString(QString data, Tree tree);
 
 
 public:
