@@ -6,8 +6,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QMap>
-#include "tree.h"
-#include "node.h"
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -21,11 +20,14 @@ private slots:
 
 private:
     QVector<QString> encodeHuffman(QVector<int> frequencies);
-    Tree buildTree(QVector<int> frequencies);
-    QMap<int, QString>* buildEncodingDict(Tree tree);
-    void traverseTree(Node *node, QString path, QMap<int, QString> *encoding_dict);
-    QByteArray convertBinary(QByteArray data, QMap<int, QString> *code, int &remLength);
-    QString decodeString(QString data, Tree tree);
+    QByteArray convertBinary(QByteArray data, QVector<QString> code, int &remLength);
+    QMap<QByteArray, QPair<QByteArray, QByteArray>> calculateQTree(QVector<int> frequencies, QByteArray &parent);
+    void calculateEncodings(QMap<QByteArray, QPair<QByteArray, QByteArray>> &map,
+                            QByteArray &parent, QVector<QString> &encodings, QByteArray current, QString path);
+    QString reconstructString(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
+                              int remLength, QByteArray &parent, QByteArray current);
+
+
 
 
 public:

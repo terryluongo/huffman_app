@@ -1,9 +1,7 @@
 #include "mainwindow.h"
 #include <typeinfo>
-#include "tree.h"
 #include <queue>
 #include <QMap>
-#include "node.h"
 #include <QString>
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -44,6 +42,7 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::openFile() {
+
     QString filename = QFileDialog::getOpenFileName();
     qDebug() << filename;
 
@@ -84,29 +83,30 @@ void MainWindow::openFile() {
 
 void MainWindow::encodeData() {
 
-    Tree tree = buildTree(*frequencies);
-    QMap<int, QString> *code = buildEncodingDict(tree);
 
+    QByteArray root;
+    QMap<QByteArray, QPair<QByteArray, QByteArray>> parents = calculateQTree(*frequencies, root);
+
+    //for (auto iPC = parents.begin(); iPC != parents.end(); ++iPC)
+    //    qDebug() << iPC.key() << " -> " << iPC.value().first << iPC.value().second;
+
+
+    QVector<QString> encodings(256,0);
+    calculateEncodings(parents, root, encodings, root, "");
 
 
     table->sortByColumn(0, Qt::AscendingOrder);
 
     for (int iRow = 0; iRow < 256; ++iRow) {
-        QTableWidgetItem *index = new QTableWidgetItem(QString(code->value(iRow)));
+        QTableWidgetItem *index = new QTableWidgetItem(QString(encodings[iRow]));
         table->setItem(iRow, 3, index);
     }
 
     table->sortByColumn(1, Qt::DescendingOrder);
 
     int remLength = 0;
-    qDebug() << remLength;
-    QByteArray binaryData = convertBinary(data, code, remLength);
 
-    qDebug() << remLength;
-
-
-
-
+    QByteArray binaryData = convertBinary(data, encodings, remLength);
 
     QString outName = QFileDialog::getSaveFileName(this, "Save file"); //maybe filter "huffman (*.huf");
     if (outName.isEmpty()) return;
@@ -119,21 +119,15 @@ void MainWindow::encodeData() {
 
     QDataStream out(&outFile);
 
-
-    // if it is all Qt objects we can just do this
-    out << *code;
-    out << remLength;
-    // have to encode # digits in remainder
+    out << parents << root << remLength;
 
     // skip to the good stuff with constData
     out.writeBytes(binaryData.constData(), binaryData.size());
 
-    \  out.readBytes()
 
 }
 
 void MainWindow::decodeData() {
-    QMap<int, QString> code;
 
 
     QString inName = QFileDialog::getOpenFileName();
@@ -145,38 +139,35 @@ void MainWindow::decodeData() {
         return;
     }
     QDataStream in(&inFile);
-    in >> code;
-    int remLength;
-    in >> remLength;
 
-    qDebug() << remLength;
+    QMap<QByteArray, QPair<QByteArray, QByteArray>> parents;
+    QByteArray root;
+    int remLength;
+
+    in >> parents >> root >> remLength;
 
     char* rawBytes; uint length;
     in.readBytes(rawBytes, length);
     QByteArray bytes(rawBytes, length);
     delete[] rawBytes;
+    // the bytes aren't being encoded and decoded for some reason: length 0 when decoding
 
-
-
-
-
+    QString reconstructed = reconstructString(bytes, parents, remLength, root, root);
 }
 
-QByteArray MainWindow::convertBinary(QByteArray data, QMap<int, QString> *code, int &remLength) {
+
+QByteArray MainWindow::convertBinary(QByteArray data, QVector<QString> code, int &remLength) {
     QString stringStream("");
-    for (int i = 0; i < data.size(); i++)
-        stringStream += code->value(data[i]);
+
+    for (int i = 0; i < data.size(); i++) {
+        unsigned char byteValue = static_cast<unsigned char>(data[i]);
+        unsigned int casted = static_cast<unsigned int>(byteValue);
+        stringStream += code[casted];
+    }
     qDebug() << stringStream.size();
-//10110010
 
     QByteArray out((stringStream.size() + 7) / 8, Qt::Uninitialized);
-    // do string by byte
-    // premake QBytearray with the right size-> (stringlength + 7) / 8
-    // +7 is to round up
 
-    // index and set QBytearray to that byte string base 2
-
-    // do all full bytes
     for (int i = 0; i < stringStream.size() / 8; i++) {
         out[i] = stringStream.sliced(i * 8, 8).toInt(nullptr, 2);
     }
@@ -197,55 +188,82 @@ QByteArray MainWindow::convertBinary(QByteArray data, QMap<int, QString> *code, 
 
 }
 
-Tree MainWindow::buildTree(QVector<int> frequencies) {
+QString MainWindow::reconstructString(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
+                                      int remLength, QByteArray &parent, QByteArray current) {
 
-    // from chatgpt
-    // Custom comparison functor to prioritize smaller weights (min-heap)
-    struct CompareTree {
-        bool operator()(const Tree& n1, const Tree& n2) {
-            return n1.root->getWeight() > n2.root->getWeight();
+    QString text("");
+    qDebug() << "hi";
+    int length = raw.size();
+    if (remLength != 0) length--;
+    qDebug() << length;
+    for (int i = 0; i < 3; i++) {
+        qDebug() << i;
+        qDebug() << "hello";
+        unsigned char byte = raw[i];
+        qDebug() << "bye";
+
+        for (int mask = 128; mask > 0; mask = mask >> 1) {
+            if (current.size() == 1) {
+                text += QString(current);
+                current = parent;
+            }
+            current = byte & mask ? map[current].second : map[current].first;
         }
-    };
-
-    std::priority_queue<Tree, std::vector<Tree>, CompareTree> queue;
-
-    for (int i = 0; i < frequencies.size(); i++) {
-        if (frequencies[i] > 0)
-            queue.push(Tree(frequencies[i], i));
     }
-
-    while (queue.size() > 1) {
-        Tree first = queue.top();
-        queue.pop();
-        Tree second = queue.top();
-        queue.pop();
-        Tree combined = Tree(first.root, second.root);
-        queue.push(combined);
-    }
-
-    return queue.top();
-
-
+    qDebug() << text.first(200);
+    return text;
 }
 
-// helper method for buildEncodingDict method
-// DFS, keeps track of the path traveled
-// once we reach leaf node, add letter to HashMap with corresponding path
-void MainWindow::traverseTree(Node *node, QString path, QMap<int, QString>* encoding_dict) {
-    if (node->getLetter() != -1) {
-        encoding_dict->insert(node->getLetter(), path);
+QMap<QByteArray, QPair<QByteArray, QByteArray>> MainWindow::calculateQTree(QVector<int> frequencies, QByteArray &parent) {
+
+    QMultiMap<int, QByteArray> toDo;  // Maps a frequency to the QByteArray it corresponds to
+    for (int code = 0; code < 256; ++code)
+        if (frequencies[code] > 0)
+            toDo.insert(frequencies[code], QByteArray(1, code));
+
+
+    QMap<QByteArray, QPair<QByteArray, QByteArray> > parentChildren;
+    while (toDo.size() > 1) {
+        int freq0 = toDo.begin().key();
+        QByteArray chars0 = toDo.begin().value();
+        toDo.erase(toDo.begin());
+
+        int freq1 = toDo.begin().key();
+        QByteArray chars1 = toDo.begin().value();
+        toDo.erase(toDo.begin());
+
+        int parentFreq = freq0 + freq1;
+        QByteArray parentChars = chars0 + chars1;
+        toDo.insert(parentFreq, parentChars);
+
+        parentChildren[parentChars] = qMakePair(chars0, chars1);
+    }
+
+    parent = toDo.begin().value();
+    return parentChildren;
+
+
+    /*
+    for (auto iPC = parentChildren.begin(); iPC != parentChildren.end(); ++iPC)
+        qDebug() << iPC.key() << " -> " << iPC.value().first << iPC.value().second;
+    */
+}
+
+void MainWindow:: calculateEncodings(QMap<QByteArray, QPair<QByteArray, QByteArray>> &map,
+                                    QByteArray &parent, QVector<QString> &encodings, QByteArray current, QString path) {
+    if (current.size() == 1) {
+        // was having issues with certain values so doing this; got online
+        unsigned char byteValue = static_cast<unsigned char>(current[0]);
+        unsigned int casted = static_cast<unsigned int>(byteValue);
+        encodings[casted] = path;
         return;
     }
-    traverseTree(node->getLeft(), path + "0", encoding_dict);
-    traverseTree(node->getRight(), path + "1", encoding_dict);
-}
 
+    QPair<QByteArray, QByteArray> children = map.value(current);
+    calculateEncodings(map, parent, encodings, children.first, path + "0");
+    calculateEncodings(map, parent, encodings, children.second, path + "1");
 
-// traverse tree to figure out binary representation of each string, return in QMap
-QMap<int, QString>* MainWindow::buildEncodingDict(Tree tree) {
-    QMap<int, QString> *encoding_dict = new QMap<int, QString>();
-    traverseTree(tree.root, "", encoding_dict);
-    return encoding_dict;
+    return;
 }
 
 
