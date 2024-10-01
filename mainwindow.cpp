@@ -7,36 +7,29 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     QWidget *center = new QWidget();
-
     setCentralWidget(center);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(center);
-
     QHBoxLayout *menubar = new QHBoxLayout(center);
-
     mainLayout->addLayout(menubar);
 
-    QPushButton *openFileButton = new QPushButton(center);
-    openFileButton->setText("Load");
+    QPushButton *openFileButton = new QPushButton("Load", center);
     connect(openFileButton, &QPushButton::clicked, this, &MainWindow::openFile);
     menubar->addWidget(openFileButton);
 
-    QPushButton *encodeDataButton = new QPushButton(center);
-    encodeDataButton->setText("Encode");
+    QPushButton *encodeDataButton = new QPushButton("Encode", center);
     connect(encodeDataButton, &QPushButton::clicked, this, &MainWindow::encodeData);
     menubar->addWidget(encodeDataButton);
 
-    QPushButton *decodeDataButton = new QPushButton(center);
-    decodeDataButton->setText("Decode");
+    QPushButton *decodeDataButton = new QPushButton("Decode", center);
     connect(decodeDataButton, &QPushButton::clicked, this, &MainWindow::decodeData);
     menubar->addWidget(decodeDataButton);
 
-    table = new QTableWidget(center);
+    table = new QTableWidget(256, 4, center);
     mainLayout->addWidget(table);
-    table->setRowCount(256);
-    table->setColumnCount(4);
 
 }
+
 
 MainWindow::~MainWindow() {
 }
@@ -83,30 +76,23 @@ void MainWindow::openFile() {
 
 void MainWindow::encodeData() {
 
-
     QByteArray root;
     QMap<QByteArray, QPair<QByteArray, QByteArray>> parents = calculateQTree(*frequencies, root);
-
-    //for (auto iPC = parents.begin(); iPC != parents.end(); ++iPC)
-    //    qDebug() << iPC.key() << " -> " << iPC.value().first << iPC.value().second;
-
 
     QVector<QString> encodings(256,0);
     calculateEncodings(parents, root, encodings, root, "");
 
-
+    // have to sort so it is filled in properly
     table->sortByColumn(0, Qt::AscendingOrder);
-
     for (int iRow = 0; iRow < 256; ++iRow) {
         QTableWidgetItem *index = new QTableWidgetItem(QString(encodings[iRow]));
         table->setItem(iRow, 3, index);
     }
-
     table->sortByColumn(1, Qt::DescendingOrder);
 
     int remLength = 0;
-
     QByteArray binaryData = convertBinary(data, encodings, remLength);
+    qDebug() << binaryData.size();
 
     QString outName = QFileDialog::getSaveFileName(this, "Save file"); //maybe filter "huffman (*.huf");
     if (outName.isEmpty()) return;
@@ -118,12 +104,11 @@ void MainWindow::encodeData() {
     }
 
     QDataStream out(&outFile);
+    out.setVersion(QDataStream::Qt_5_15);
 
-    out << parents << root << remLength;
-
-    // skip to the good stuff with constData
-    out.writeBytes(binaryData.constData(), binaryData.size());
-
+    int size = binaryData.size();
+    out << parents << root << remLength << size;
+    out.writeRawData(binaryData.constData(), size);
 
 }
 
@@ -133,26 +118,53 @@ void MainWindow::decodeData() {
     QString inName = QFileDialog::getOpenFileName();
 
     QFile inFile(inName);
-    if (!inFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        //qDebug() << "File broken.  Not gonna run.";
+    if (!inFile.open(QIODevice::ReadOnly)) {
         QMessageBox::information(this, "Error", QString("Can't open file \"%1\""), inName);
         return;
     }
     QDataStream in(&inFile);
+    in.setVersion(QDataStream::Qt_5_15);
+
 
     QMap<QByteArray, QPair<QByteArray, QByteArray>> parents;
-    QByteArray root;
-    int remLength;
+    QByteArray root; int remLength; int size;
+    in >> parents >> root >> remLength >> size;
 
-    in >> parents >> root >> remLength;
+    QByteArray bytes;
+    bytes.resize(size);
+    in.readRawData(bytes.data(), size);
 
-    char* rawBytes; uint length;
-    in.readBytes(rawBytes, length);
-    QByteArray bytes(rawBytes, length);
-    delete[] rawBytes;
-    // the bytes aren't being encoded and decoded for some reason: length 0 when decoding
+    QByteArray reconstructed = reconstructBytes(bytes, parents, remLength, root, root);
+    QVector<QString> encodings(256,0);
+    calculateEncodings(parents, root, encodings, root, "");
 
-    QString reconstructed = reconstructString(bytes, parents, remLength, root, root);
+
+    frequencies = new QVector<int>(256, 0);
+    for (int iPos = 0; iPos < reconstructed.length(); ++iPos)
+        ++(*frequencies)[(unsigned char) reconstructed[iPos]];
+
+
+    table->sortByColumn(0, Qt::AscendingOrder);
+
+    for (int iRow = 0; iRow < 256; ++iRow) {
+        QTableWidgetItem *index = new QTableWidgetItem();
+        index->setData(Qt::DisplayRole, iRow);
+        table->setItem(iRow, 0, index);
+
+        QTableWidgetItem *count = new QTableWidgetItem();
+        count->setData(Qt::DisplayRole, (*frequencies)[iRow]);
+        table->setItem(iRow, 1, count);
+
+        QTableWidgetItem *character = new QTableWidgetItem(QString((char) iRow));
+        table->setItem(iRow, 2, character);
+
+        QTableWidgetItem *codings = new QTableWidgetItem(QString(encodings[iRow]));
+        table->setItem(iRow, 3, codings);
+
+        //TODO: ENCODING MAPPING BREAKS WHEN WE LOAD MORE THAN ONE FILE
+    }
+    table->sortByColumn(1, Qt::DescendingOrder);
+    qDebug() << "done!";
 }
 
 
@@ -164,54 +176,59 @@ QByteArray MainWindow::convertBinary(QByteArray data, QVector<QString> code, int
         unsigned int casted = static_cast<unsigned int>(byteValue);
         stringStream += code[casted];
     }
-    qDebug() << stringStream.size();
 
     QByteArray out((stringStream.size() + 7) / 8, Qt::Uninitialized);
-
     for (int i = 0; i < stringStream.size() / 8; i++) {
         out[i] = stringStream.sliced(i * 8, 8).toInt(nullptr, 2);
     }
 
-
-    // convert remainder to int
+    // convert remainder to int, if string not evenly divisble set last byte to remainder
     int remainder = stringStream.chopped(stringStream.size() % 8).toInt(nullptr, 2);
-    // if string not evenly divisble set last one to remainder
     if (stringStream.size() % 8)
         out[out.size() - 1] = remainder;
 
-    remLength = stringStream.size() % 8;
+    remLength = stringStream.size() % 8; //need to return 2 things so I have this passed by reference
+
     return out;
 
-    // do remainder bytes
 
-    // have to do .write() and .read() for the unserialized bytes
 
 }
 
-QString MainWindow::reconstructString(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
+QByteArray MainWindow::reconstructBytes(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
                                       int remLength, QByteArray &parent, QByteArray current) {
-
-    QString text("");
-    qDebug() << "hi";
+    QByteArray bytes;
     int length = raw.size();
     if (remLength != 0) length--;
-    qDebug() << length;
-    for (int i = 0; i < 3; i++) {
-        qDebug() << i;
-        qDebug() << "hello";
-        unsigned char byte = raw[i];
-        qDebug() << "bye";
 
+    for (int i = 0; i < length; i++) {
+        unsigned char byte = raw[i];
         for (int mask = 128; mask > 0; mask = mask >> 1) {
             if (current.size() == 1) {
-                text += QString(current);
+                bytes.append(current);
                 current = parent;
             }
             current = byte & mask ? map[current].second : map[current].first;
         }
     }
-    qDebug() << text.first(200);
-    return text;
+
+    if (remLength == 0) return bytes; // 't have to deal with remainder
+
+    unsigned char byte = raw[raw.size() - 1];
+    //i apologize for this for loop initialization; dealing with remainder
+    for (int mask = 128 >> (8 - remLength); mask > 0; mask = mask >> 1) {
+        if (current.size() == 1) {
+            bytes.append(current);
+            current = parent;
+        }
+        current = byte & mask ? map[current].second : map[current].first;
+    }
+    /*if (current.size() == 1) {
+        bytes.append(current);
+        current = parent;
+    } */
+    qDebug() << bytes.size();
+    return bytes;
 }
 
 QMap<QByteArray, QPair<QByteArray, QByteArray>> MainWindow::calculateQTree(QVector<int> frequencies, QByteArray &parent) {
@@ -242,17 +259,12 @@ QMap<QByteArray, QPair<QByteArray, QByteArray>> MainWindow::calculateQTree(QVect
     parent = toDo.begin().value();
     return parentChildren;
 
-
-    /*
-    for (auto iPC = parentChildren.begin(); iPC != parentChildren.end(); ++iPC)
-        qDebug() << iPC.key() << " -> " << iPC.value().first << iPC.value().second;
-    */
 }
 
 void MainWindow:: calculateEncodings(QMap<QByteArray, QPair<QByteArray, QByteArray>> &map,
                                     QByteArray &parent, QVector<QString> &encodings, QByteArray current, QString path) {
     if (current.size() == 1) {
-        // was having issues with certain values so doing this; got online
+        // was having issues with certain values and signed vs unsigned so doing this; got online
         unsigned char byteValue = static_cast<unsigned char>(current[0]);
         unsigned int casted = static_cast<unsigned int>(byteValue);
         encodings[casted] = path;

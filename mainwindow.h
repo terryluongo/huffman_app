@@ -13,6 +13,7 @@ class MainWindow : public QMainWindow
     QByteArray data;
     QTableWidget *table;
     QVector<int> *frequencies;
+    QWidget *center;
 private slots:
     void openFile();
     void encodeData();
@@ -24,8 +25,9 @@ private:
     QMap<QByteArray, QPair<QByteArray, QByteArray>> calculateQTree(QVector<int> frequencies, QByteArray &parent);
     void calculateEncodings(QMap<QByteArray, QPair<QByteArray, QByteArray>> &map,
                             QByteArray &parent, QVector<QString> &encodings, QByteArray current, QString path);
-    QString reconstructString(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
+    QByteArray reconstructBytes(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
                               int remLength, QByteArray &parent, QByteArray current);
+
 
 
 
