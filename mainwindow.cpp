@@ -36,13 +36,13 @@ MainWindow::~MainWindow() {
 
 void MainWindow::openFile() {
 
-    QString filename = QFileDialog::getOpenFileName();
+    filename = QFileDialog::getOpenFileName();
     qDebug() << filename;
 
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         //qDebug() << "File broken.  Not gonna run.";
-        QMessageBox::information(this, "Error", QString("Can't open file \"%1\""), filename);
+        QMessageBox::information(this, "Error", QString("Can't open file \"%1\"").arg(filename));
         return;
     }
 
@@ -55,6 +55,7 @@ void MainWindow::openFile() {
     }
 
 
+    table->sortByColumn(0, Qt::AscendingOrder);
 
     for (int iRow = 0; iRow < 256; ++iRow) {
         QTableWidgetItem *index = new QTableWidgetItem();
@@ -68,7 +69,6 @@ void MainWindow::openFile() {
         QTableWidgetItem *character = new QTableWidgetItem(QString((char) iRow));
         table->setItem(iRow, 2, character);
 
-        //TODO: ENCODING MAPPING BREAKS WHEN WE LOAD MORE THAN ONE FILE
         table->sortByColumn(1, Qt::DescendingOrder);
     }
 }
@@ -110,6 +110,11 @@ void MainWindow::encodeData() {
     out << parents << root << remLength << size;
     out.writeRawData(binaryData.constData(), size);
 
+    int oldSize = QFileInfo(QFile(filename)).size() / 1000;
+    int newSize = QFileInfo(outFile).size() / 1000;
+    QMessageBox::information(this, "Ok",
+                             QString("Original File Size: %1kb\nNew File Size: %2kb").arg(oldSize).arg(newSize));
+
 }
 
 void MainWindow::decodeData() {
@@ -119,7 +124,7 @@ void MainWindow::decodeData() {
 
     QFile inFile(inName);
     if (!inFile.open(QIODevice::ReadOnly)) {
-        QMessageBox::information(this, "Error", QString("Can't open file \"%1\""), inName);
+        QMessageBox::information(this, "Error", QString("Can't open file \"%1\"").arg(inName));
         return;
     }
     QDataStream in(&inFile);
@@ -165,6 +170,21 @@ void MainWindow::decodeData() {
     }
     table->sortByColumn(1, Qt::DescendingOrder);
     qDebug() << "done!";
+
+
+    QString saveName = QFileDialog::getSaveFileName(this, "Save file"); //maybe filter "huffman (*.huf");
+    if (saveName.isEmpty()) return;
+
+    QFile saveFile(saveName);
+    if (!saveFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QMessageBox::information(this, "Error", QString("Can't write to file \"%1\"").arg(saveName));
+        return;
+    }
+
+    QDataStream save(&saveFile);
+    save.setVersion(QDataStream::Qt_5_15);
+
+    save.writeBytes(reconstructed.constData(), reconstructed.size());
 }
 
 
@@ -190,8 +210,6 @@ QByteArray MainWindow::convertBinary(QByteArray data, QVector<QString> code, int
     remLength = stringStream.size() % 8; //need to return 2 things so I have this passed by reference
 
     return out;
-
-
 
 }
 
@@ -223,10 +241,7 @@ QByteArray MainWindow::reconstructBytes(QByteArray raw, QMap<QByteArray, QPair<Q
         }
         current = byte & mask ? map[current].second : map[current].first;
     }
-    /*if (current.size() == 1) {
-        bytes.append(current);
-        current = parent;
-    } */
+
     qDebug() << bytes.size();
     return bytes;
 }

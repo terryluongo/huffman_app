@@ -27,7 +27,7 @@ private:
                             QByteArray &parent, QVector<QString> &encodings, QByteArray current, QString path);
     QByteArray reconstructBytes(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
                               int remLength, QByteArray &parent, QByteArray current);
-
+    QString filename;
 
 
 
