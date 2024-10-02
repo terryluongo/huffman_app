@@ -20,15 +20,9 @@ private slots:
     void decodeData();
 
 private:
-    QVector<QString> encodeHuffman(QVector<int> frequencies);
-    QByteArray convertBinary(QByteArray data, QVector<QString> code, int &remLength);
-    QMap<QByteArray, QPair<QByteArray, QByteArray>> calculateQTree(QVector<int> frequencies, QByteArray &parent);
-    void calculateEncodings(QMap<QByteArray, QPair<QByteArray, QByteArray>> &map,
-                            QByteArray &parent, QVector<QString> &encodings, QByteArray current, QString path);
-    QByteArray reconstructBytes(QByteArray raw, QMap<QByteArray, QPair<QByteArray, QByteArray>> map,
-                              int remLength, QByteArray &parent, QByteArray current);
     QString filename;
-
+    void populateTable(QVector<int> frequencies = QVector<int>(), QVector<QString> encodings = QVector<QString>());
+    QFile* returnQFile(QFile::OpenMode flags, bool saveFlag);
 
 
 
